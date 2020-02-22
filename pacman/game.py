@@ -699,6 +699,17 @@ class Game:
             else:
                 self.state = self.state.generateSuccessor( agentIndex, action )
 
+
+            #METO AQUI LA FUNCIOOOOOON
+            if hasattr(agent, "printLineData"):
+
+                with open("data.txt", "a") as infile:
+                    infile.write(agent.printLineData(self.state)+"\n")
+
+
+
+
+
             # Change the display
             self.display.update( self.state.data )
             ###idx = agentIndex - agentIndex % 2 + 1

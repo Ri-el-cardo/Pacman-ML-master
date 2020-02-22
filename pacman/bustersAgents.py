@@ -10,7 +10,7 @@
 # (denero@cs.berkeley.edu) and Dan Klein (klein@cs.berkeley.edu).
 # Student side autograding was added by Brad Miller, Nick Hay, and
 # Pieter Abbeel (pabbeel@cs.berkeley.edu).
-#aver si8 se actualiza ecdsto 2
+
 
 import util
 from game import Agent
@@ -127,7 +127,7 @@ class RandomPAgent(BustersAgent):
     def registerInitialState(self, gameState):
         BustersAgent.registerInitialState(self, gameState)
         self.distancer = Distancer(gameState.data.layout, False)
-        
+
     ''' Example of counting something'''
     def countFood(self, gameState):
         food = 0
@@ -136,8 +136,8 @@ class RandomPAgent(BustersAgent):
                 if(height == True):
                     food = food + 1
         return food
-    
-    ''' Print the layout'''  
+
+    ''' Print the layout'''
     def printGrid(self, gameState):
         table = ""
         ##print(gameState.data.layout) ## Print by terminal
@@ -147,7 +147,7 @@ class RandomPAgent(BustersAgent):
                 table = table + gameState.data._foodWallStr(food[x][y], walls[x][y]) + ","
         table = table[:-1]
         return table
-        
+
     def chooseAction(self, gameState):
         move = Directions.STOP
         legal = gameState.getLegalActions(0) ##Legal position from the pacman
@@ -157,7 +157,7 @@ class RandomPAgent(BustersAgent):
         if   ( move_random == 2 ) and Directions.NORTH in legal:   move = Directions.NORTH
         if   ( move_random == 3 ) and Directions.SOUTH in legal: move = Directions.SOUTH
         return move
-        
+
 class GreedyBustersAgent(BustersAgent):
     "An agent that charges the closest ghost."
 
@@ -202,13 +202,101 @@ class GreedyBustersAgent(BustersAgent):
              if livingGhosts[i+1]]
         return Directions.EAST
 
+
+class Node:
+    def __init__(self, parent=None, position=None):
+        self.parent = parent
+        self.position = position
+
+        self.g = 0
+        self.h = 0
+        self.f = 0
+
+    def __eq__(self, other):
+        return self.position == other.position
+
+    def __hash__(self):
+        return hash(self.position)
+
+    def __str__(self):
+        a + b
+        a.__add__(b)
+        return "Node({})".format(self.position)
+
+def children(parent, position, grid):
+    offsets = []
+    width, length = len(grid.data), len(grid.data[0])
+
+    for child in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+        offi = position[0] + child[0], position[1] + child[1]
+        xw, yw = offi
+        if width >= xw >= 0 and length >= yw >= 0 and grid[xw][yw] != True:
+            offsets.append(Node(parent, offi))
+
+
+    return offsets
+
+
+def aStar(start, goal, grid):
+
+    openset = set()
+    closedset = set()
+    current = Node(None, start)
+    openset.add(current)
+
+    while len(openset) > 0:
+        current = min(openset, key=lambda v: v.f)
+        if current.position == goal:
+            path = []
+            while current.parent is not None:
+                path.append(current)
+                current = current.parent
+            path.append(current)
+            path.reverse()
+            return path
+
+        openset.remove(current)
+        closedset.add(current)
+        for node in children(current, current.position, grid):
+
+            if node in closedset:
+                continue
+
+            new_g = current.g + 1
+            if node.g > new_g:
+                node.g = new_g
+                node.parent = current
+            else:
+                node.g = new_g
+                node.h = abs(node.position[0]-goal[0])+abs(node.position[1]-goal[1])
+                node.f = node.g + node.h
+                openset.add(node)
+
+        #raise ValueError('No path found')
+
+
+def closest_ghost(gameState):
+    dist = gameState.data.ghostDistances
+    alive = gameState.getLivingGhosts()[1:]
+
+    closest_ghostt = (-1, -1)
+    min_dist = 999999999999
+
+    for i, ghost in enumerate(alive):
+        if dist[i] < min_dist and alive[i]:
+            min_dist = dist[i]
+            closest_ghostt = gameState.getGhostPositions()[i]
+
+    return closest_ghostt
+
+
 class BasicAgentAA(BustersAgent):
 
     def registerInitialState(self, gameState):
         BustersAgent.registerInitialState(self, gameState)
         self.distancer = Distancer(gameState.data.layout, False)
         self.countActions = 0
-        
+
     ''' Example of counting something'''
     def countFood(self, gameState):
         food = 0
@@ -217,8 +305,8 @@ class BasicAgentAA(BustersAgent):
                 if(height == True):
                     food = food + 1
         return food
-    
-    ''' Print the layout'''  
+
+    ''' Print the layout'''
     def printGrid(self, gameState):
         table = ""
         #print(gameState.data.layout) ## Print by terminal
@@ -258,16 +346,48 @@ class BasicAgentAA(BustersAgent):
         print "Map:  \n", gameState.getWalls()
         # Puntuacion
         print "Score: ", gameState.getScore()
-        
-        
+
+
+
     def chooseAction(self, gameState):
         self.countActions = self.countActions + 1
         self.printInfo(gameState)
         move = Directions.STOP
-        legal = gameState.getLegalActions(0) ##Legal position from the pacman
-        move_random = random.randint(0, 3)
-        if   ( move_random == 0 ) and Directions.WEST in legal:  move = Directions.WEST
-        if   ( move_random == 1 ) and Directions.EAST in legal: move = Directions.EAST
-        if   ( move_random == 2 ) and Directions.NORTH in legal:   move = Directions.NORTH
-        if   ( move_random == 3 ) and Directions.SOUTH in legal: move = Directions.SOUTH
+        legal = gameState.getLegalActions(0)
+
+        goal = closest_ghost(gameState)
+        start = gameState.getPacmanPosition()
+        maze = gameState.getWalls()
+
+        path = aStar(start, goal, maze)
+        path_next = path[1].position
+
+        next_move = path_next[0]-start[0], path_next[1]-start[1]
+
+        if next_move == (0, -1):
+            move = Directions.SOUTH
+        elif next_move == (0, 1):
+            move = Directions.NORTH
+        elif next_move == (1, 0):
+            move = Directions.EAST
+        elif next_move == (-1, 0):
+            move = Directions.WEST
+
         return move
+
+
+
+
+
+    def printLineData(self, state):
+        """
+        s = str(state.getGhostPositions()) + ", " + str(state.getGhostDirections()) + ", " \
+               + str(state.getDistanceNearestFood)
+        """
+
+        s = ", ".join([
+            str(state.getPacmanPosition()),
+            str(state.getGhostPositions()),
+        ])
+
+        return s
